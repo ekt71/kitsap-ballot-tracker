@@ -110,7 +110,7 @@ footer { font-size: 13px; color: var(--muted); }
   <div class="summary" id="summary" aria-live="polite">
     <div><div class="eyebrow">Counted statewide</div><div class="v num" id="sballots">–</div><div class="s" id="sleft">Waiting for the first count</div></div>
     <div><div class="eyebrow">Counted in Kitsap</div><div class="v num" id="ballots">–</div><div class="s" id="turnout">Waiting for the first count</div></div>
-    <div><div class="eyebrow">Next count expected</div><div class="v" id="next">8 p.m. tonight</div><div class="s" id="checked">Updated –</div></div>
+    <div><div class="eyebrow">Next count expected</div><div class="v" id="next">8 p.m. tonight</div><div class="s" id="checked">Latest posted: –</div></div>
   </div>
 
   <div class="banner" id="flips" hidden></div>
@@ -220,7 +220,8 @@ function render(d) {
   $("sleft").textContent = st.ballots ? (st.pctCounted ? pctLabel(st.pctCounted).replace(/^est/, "Est") + (st.left ? ` · about ${fmt(st.left)} left` : "") : st.left ? `About ${fmt(st.left)} ballots left to count` : `${st.registered ? (100 * st.ballots / st.registered).toFixed(1) + "% turnout" : "Counting"}`) : "Waiting for the first count";
   $("ballots").textContent = d.ballots ? fmt(d.ballots) : "–";
   $("turnout").textContent = d.ballots ? `${st.kitsapPct ? pctLabel(st.kitsapPct).replace(/^est/, "Est") + " · " : ""}${d.registered ? (100 * d.ballots / d.registered).toFixed(1) + "% turnout" : ""}` : "Waiting for the first count";
-  $("checked").textContent = d.checkedAt ? "Updated " + when(d.checkedAt) : "";
+  const asOf = [st.asOf && st.ballots ? "state " + when(st.asOf) : "", d.ballots && d.countStamp ? "Kitsap " + d.countStamp.replace(/^\d+\/\d+\/\d+ /, "") : ""].filter(Boolean).join(", ");
+  $("checked").textContent = asOf ? "Latest posted: " + asOf : "";
   const flips = (d.flips || []);
   $("flips").hidden = !flips.length;
   if (flips.length) $("flips").innerHTML = "Lead changes in the latest count:<ul>" + flips.map(f => "<li>" + esc(f) + "</li>").join("") + "</ul>";
