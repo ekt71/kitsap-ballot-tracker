@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Live results for Kitsap County (Legislative District 23) contests in the November 3, 2026 Washington general election.">
+<title>Kitsap Ballot Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: one reading column; a count summary up top, contests grouped as they appear on the ballot, notes at the end */
+:root {
+  --paper: #f6f7f9;
+  --card: #ffffff;
+  --ink: #1b2233;
+  --muted: #5b6475;
+  --rule: #dde1e8;
+  --track: #e8ebf1;
+  --mark: #24357a;        /* ballot marker blue: the leading choice */
+  --mark-soft: #c9d1ec;   /* trailing choices */
+  --flag: #8a5a00;
+  --flag-bg: #fff4dc;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "Public Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #12151c; --card: #1a1f29; --ink: #e8ebf2; --muted: #9aa3b5; --rule: #2b3241;
+  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #12151c; --card: #1a1f29; --ink: #e8ebf2; --muted: #9aa3b5; --rule: #2b3241;
+  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; color-scheme: dark }
+
+html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; line-height: 1.15; }
+h2 { font-size: 20px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 6px; }
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.summary > div { background: var(--card); padding: 14px 16px; display: grid; gap: 2px; min-width: 0; }
+.summary .v { font-size: 22px; font-weight: 700; }
+.summary .s { font-size: 13px; color: var(--muted); }
+@media (max-width: 560px) { .summary { grid-template-columns: 1fr; } }
+
+.banner { background: var(--flag-bg); color: var(--flag); border-radius: 8px; padding: 10px 14px; font-weight: 500; }
+.banner ul { margin: 4px 0 0; padding-left: 18px; }
+.state { color: var(--muted); padding: 16px; border: 1px dashed var(--rule); border-radius: 8px; }
+
+section.group { display: grid; gap: 12px; }
+.contest { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.contest .head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.contest h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.contest .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.contest .scope { font-size: 12px; color: var(--muted); margin-top: 4px; letter-spacing: .02em; }
+.mine { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .03em;
+  color: var(--mark); border: 1px solid var(--mark-soft); border-radius: 99px; padding: 0 7px; margin-left: 8px; vertical-align: 1px; white-space: nowrap; }
+.mine svg { width: 10px; height: 10px; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--track); color: var(--muted); white-space: nowrap; }
+.pill.lead { background: var(--mark); color: var(--card); }
+
+.row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; }
+.row .who { min-width: 0; }
+.row .who b { font-weight: 600; }
+.row .who span { color: var(--muted); font-size: 13px; }
+.row .fig { text-align: right; }
+.row .fig b { font-weight: 700; }
+.row .fig span { color: var(--muted); font-size: 13px; margin-left: 8px; }
+.bar { grid-column: 1 / -1; height: 8px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--mark-soft); border-radius: 4px; transition: width .6s ease; }
+.row.top .bar i { background: var(--mark); }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+
+.split { position: relative; display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: var(--track); }
+.split i { display: block; height: 100%; transition: width .6s ease; }
+.split .yes { background: var(--mark); }
+.split .no { background: var(--mark-soft); }
+.split::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .55; }
+.splitlabels { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.splitlabels span { color: var(--muted); font-size: 13px; }
+.margin { font-size: 13px; color: var(--muted); }
+
+.notes { display: grid; gap: 10px; }
+.notes dl { margin: 0; display: grid; gap: 12px; }
+.notes dt { font-weight: 700; }
+.notes dd { margin: 2px 0 0; color: var(--muted); max-width: 65ch; }
+a { color: var(--mark); }
+footer { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Kitsap County · General Election · November 3, 2026</div>
+    <h1>Kitsap Ballot Tracker</h1>
+    <p>Results for 18 contests on the Kitsap County ballot in Legislative District 23. Statewide and multi-county races use the Secretary of State's totals; county and legislative races use Kitsap County's count. Refreshed automatically when new numbers post.</p>
+  </header>
+
+  <div class="summary" id="summary" aria-live="polite">
+    <div><div class="eyebrow">Counted statewide</div><div class="v num" id="sballots">–</div><div class="s" id="sleft">Waiting for the first count</div></div>
+    <div><div class="eyebrow">Counted in Kitsap</div><div class="v num" id="ballots">–</div><div class="s" id="turnout">Waiting for the first count</div></div>
+    <div><div class="eyebrow">Next count expected</div><div class="v" id="next">8 p.m. tonight</div><div class="s" id="checked">Updated –</div></div>
+  </div>
+
+  <div class="banner" id="flips" hidden></div>
+  <div id="board"><div class="state" id="state">Loading the latest count…</div></div>
+
+  <section class="notes">
+    <h2>Reading these results</h2>
+    <dl>
+      <dt>These are unofficial, running totals</dt>
+      <dd>Washington votes by mail, so counting takes weeks. The first count posts shortly after 8 p.m. on election night and covers ballots received before Election Day. The county adds more ballots in later counts, usually posted by 5 p.m. on business days, until it certifies the election on November 24.</dd>
+      <dt>Early leads can change</dt>
+      <dd>Ballots dropped off on Election Day or postmarked by November 3 arrive and get counted later. Late ballots often break differently from early ones, so a narrow margin on election night can shrink, grow or flip.</dd>
+      <dt>Where the numbers come from</dt>
+      <dd>The three state measures and the Supreme Court races are decided statewide. Congressional District 6 and the Court of Appeals seat each cover six counties. For those, the page shows the Secretary of State's combined totals and how many counties have reported. The legislative, county and PUD contests are decided entirely within Kitsap County, so they use the county's own count. Counties post on their own schedules, so statewide totals can move several times a day.</dd>
+      <dt>How the percentages work</dt>
+      <dd>Each percentage is that choice's share of votes cast in the contest, including write-ins. Ballots left blank in a contest (undervotes) or marked for too many choices (overvotes) are not counted toward any choice. Measures pass with a simple majority, shown by the center line.</dd>
+      <dt>Party preference</dt>
+      <dd>In Washington's top-two system, the party shown is the one each candidate says they prefer. It does not mean the party nominated or endorsed them. Judicial races are nonpartisan.</dd>
+    </dl>
+  </section>
+
+  <footer>Sources: <a href="https://results.votewa.gov/results/public/washington/elections/20261103" target="_blank" rel="noopener">Washington Secretary of State results</a> and <a href="https://www.kitsap.gov/auditor/Documents/results.html" target="_blank" rel="noopener">Kitsap County Auditor cumulative results</a>. Checked for new results every 15 minutes through certification. Unofficial until certified. Not affiliated with either office.</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n || 0).toLocaleString("en-US");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let myVotes = {};
+let lastData = null;
+const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function isMine(c, name) {
+  const v = myVotes[c.id];
+  if (!v) return false;
+  const a = norm(v), b = norm(name);
+  return a === b || (a.length > 4 && b.startsWith(a));
+}
+const MINE = '<span class="mine" title="How you voted"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.2 4 7.6 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>My vote</span>';
+const GROUPS = ["State measures", "Federal", "Legislative", "County offices", "Judicial", "Local measure"];
+
+function when(iso) {
+  try { return new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+  catch { return ""; }
+}
+
+function nextCount() {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const d = new Date(now); const day = d.getDate(), mon = d.getMonth();
+  if (mon === 10 && day === 3 && d.getHours() < 20) return "8 p.m. tonight";
+  if (mon === 10 && day >= 24) return "Certified Nov 24";
+  let t = new Date(d); t.setHours(17, 0, 0, 0);
+  if (d >= t || t.getDay() === 0 || t.getDay() === 6) { do { t.setDate(t.getDate() + 1); } while (t.getDay() === 0 || t.getDay() === 6); }
+  const same = t.toDateString() === d.toDateString();
+  return same ? "By 5 p.m. today" : "By 5 p.m. " + t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function candidate(c) {
+  const ch = c.choices || [];
+  const counted = (c.cast || 0) > 0;
+  const real = ch.filter(x => !x.writein);
+  const lead = counted && real.length > 1 && real[0].votes > real[1].votes;
+  let pill = "";
+  const win = ch.find(x => x.winner);
+  if (win) pill = '<span class="pill lead">Winner: ' + esc(win.name) + '</span>';
+  else if (!counted) pill = '<span class="pill">No votes yet</span>';
+  else if (real.length === 1) pill = '<span class="pill">Unopposed</span>';
+  else if (real.length > 1 && real[0].votes === real[1].votes) pill = '<span class="pill">Tied</span>';
+  else pill = '<span class="pill lead">' + esc(real[0].name) + ' leads</span>';
+  const rows = ch.map((x, i) => `
+    <div class="row${counted && i === 0 && !x.writein ? " top" : ""}">
+      <div class="who"><b>${esc(x.name)}</b>${isMine(c, x.name) ? MINE : ""}${x.party ? ` <span>Prefers ${esc(x.party.replace(/ Party$/, ""))}</span>` : ""}</div>
+      <div class="fig num"><b>${counted ? x.pct.toFixed(1) + "%" : "–"}</b><span>${fmt(x.votes)}</span></div>
+      <div class="bar"><i style="width:${counted ? x.pct : 0}%"></i></div>
+    </div>`).join("");
+  const margin = lead ? `<div class="margin num">Margin: ${fmt(real[0].votes - real[1].votes)} votes (${(real[0].pct - real[1].pct).toFixed(1)} points)</div>` : "";
+  return { pill, body: rows + margin };
+}
+
+function measure(c) {
+  const ch = c.choices || [];
+  const y = ch.find(x => x.name === "Yes") || { votes: 0 }, n = ch.find(x => x.name === "No") || { votes: 0 };
+  const tot = y.votes + n.votes;
+  const yp = tot ? 100 * y.votes / tot : 0, np = tot ? 100 * n.votes / tot : 0;
+  let pill = '<span class="pill">No votes yet</span>';
+  const win = ch.find(x => x.winner);
+  if (win) pill = '<span class="pill lead">' + (win.name === "Yes" ? "Approved" : "Rejected") + '</span>';
+  else if (tot) pill = yp > 50 ? '<span class="pill lead">Yes leads</span>' : np > 50 ? '<span class="pill lead">No leads</span>' : '<span class="pill">Tied</span>';
+  const body = `
+    <div class="split" role="img" aria-label="Yes ${yp.toFixed(1)} percent, No ${np.toFixed(1)} percent"><i class="yes" style="width:${yp}%"></i><i class="no" style="width:${np}%"></i></div>
+    <div class="splitlabels num"><div><b>Yes ${tot ? yp.toFixed(1) + "%" : "–"}</b>${isMine(c, "Yes") ? MINE : ""} <span>${fmt(y.votes)}</span></div><div><span>${fmt(n.votes)}</span> ${isMine(c, "No") ? MINE.replace('margin-left','margin-right') : ""}<b>No ${tot ? np.toFixed(1) + "%" : "–"}</b></div></div>
+    ${tot ? `<div class="margin num">Margin: ${fmt(Math.abs(y.votes - n.votes))} votes (${Math.abs(yp - np).toFixed(1)} points)</div>` : ""}`;
+  return { pill, body };
+}
+
+function render(d) {
+  lastData = d;
+  $("next").textContent = nextCount();
+  if (!d) { $("state").textContent = "No count has been loaded yet. The first Kitsap count posts shortly after 8 p.m. on election night."; return; }
+  const st = d.state || {};
+  $("sballots").textContent = st.ballots ? fmt(st.ballots) : "–";
+  $("sleft").textContent = st.ballots ? (st.left ? `About ${fmt(st.left)} ballots left to count` : `${st.registered ? (100 * st.ballots / st.registered).toFixed(1) + "% turnout" : "Counting"}`) : "Waiting for the first count";
+  $("ballots").textContent = d.ballots ? fmt(d.ballots) : "–";
+  $("turnout").textContent = d.ballots ? `${d.registered ? (100 * d.ballots / d.registered).toFixed(1) + "% turnout · " : ""}count of ${d.countStamp}` : "Waiting for the first count";
+  $("checked").textContent = d.checkedAt ? "Updated " + when(d.checkedAt) : "";
+  const flips = (d.flips || []);
+  $("flips").hidden = !flips.length;
+  if (flips.length) $("flips").innerHTML = "Lead changes in the latest count:<ul>" + flips.map(f => "<li>" + esc(f) + "</li>").join("") + "</ul>";
+
+  const by = {};
+  (d.contests || []).forEach(c => (by[c.group] = by[c.group] || []).push(c));
+  $("board").innerHTML = GROUPS.filter(g => by[g]).map(g => `
+    <section class="group"><h2>${esc(g)}</h2>
+    ${by[g].map(c => {
+      const r = c.missing ? { pill: '<span class="pill">Not on county page</span>', body: "" } : (c.measure ? measure(c) : candidate(c));
+      return `<article class="contest"><div class="head"><div><h3>${esc(c.title)}</h3>${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}<div class="scope">${esc(c.scope || "")}${c.reporting ? " · " + esc(c.reporting) : ""}</div></div>${r.pill}</div>${r.body}</article>`;
+    }).join("")}
+    </section>`).join("");
+  $("board").style.display = "grid"; $("board").style.gap = "28px";
+}
+
+$("next").textContent = nextCount();
+async function load() {
+  try {
+    const r = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+  } catch (e) {
+    if (!lastData && $("state")) $("state").textContent = "Couldn't load the results. Try refreshing the page.";
+  }
+}
+load();
+setInterval(load, 120000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+</script>
+
+</body>
+</html>

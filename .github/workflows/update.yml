@@ -1,0 +1,47 @@
+name: Update results
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: update-results
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stop after certification
+        run: |
+          if [ "$(TZ=America/Los_Angeles date +%Y%m%d)" -gt 20261126 ]; then echo "Election certified; skipping."; echo "SKIP=1" >> $GITHUB_ENV; fi
+      - uses: actions/setup-python@v5
+        if: env.SKIP != '1'
+        with:
+          python-version: "3.12"
+      - name: Fetch and build data
+        if: env.SKIP != '1'
+        run: |
+          pip install -q beautifulsoup4
+          curl -sS -m 60 --retry 2 -o live.html https://www.kitsap.gov/auditor/Documents/results.html
+          curl -sS -m 120 --retry 2 -o state.json https://results.votewa.gov/results/public/api/elections/washington/20261103/data || echo "{}" > state.json
+          python3 scripts/kitsap_results.py live.html state.json data.json new.json
+          python3 - <<'PY'
+          import json
+          old = json.load(open("data.json")); new = json.load(open("new.json"))
+          strip = lambda d: {k: v for k, v in d.items() if k not in ("checkedAt",)}
+          changed = strip(old) != strip(new)
+          if changed: json.dump(new, open("data.json", "w"))
+          print("changed" if changed else "unchanged")
+          PY
+      - name: Commit if results changed
+        if: env.SKIP != '1'
+        run: |
+          git config user.name "results-bot"
+          git config user.email "results-bot@users.noreply.github.com"
+          git add data.json
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Update results $(TZ=America/Los_Angeles date '+%b %-d %-I:%M %p')"
+          git push
