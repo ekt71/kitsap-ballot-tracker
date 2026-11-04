@@ -20,15 +20,16 @@
   --mark-soft: #c9d1ec;   /* trailing choices */
   --flag: #8a5a00;
   --flag-bg: #fff4dc;
+  --good: #1d6b3a; --good-bg: #dcf1e2; --bad: #a3262a; --bad-bg: #fbe1e1;
   --display: "Source Serif 4", Georgia, "Times New Roman", serif;
   --body: "Public Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper: #12151c; --card: #1a1f29; --ink: #e8ebf2; --muted: #9aa3b5; --rule: #2b3241;
-  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; color-scheme: dark } }
+  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; --good: #8fdcaa; --good-bg: #173a24; --bad: #f4a3a3; --bad-bg: #4a1c1e; color-scheme: dark } }
 :root[data-theme="dark"] {
   --paper: #12151c; --card: #1a1f29; --ink: #e8ebf2; --muted: #9aa3b5; --rule: #2b3241;
-  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; color-scheme: dark }
+  --track: #262d3b; --mark: #8fa3f0; --mark-soft: #3a4566; --flag: #f2c46d; --flag-bg: #3a2e14; --good: #8fdcaa; --good-bg: #173a24; --bad: #f4a3a3; --bad-bg: #4a1c1e; color-scheme: dark }
 
 html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--body); }
@@ -65,6 +66,8 @@ section.group { display: grid; gap: 12px; }
 .mine svg { width: 10px; height: 10px; }
 .pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--track); color: var(--muted); white-space: nowrap; }
 .pill.lead { background: var(--mark); color: var(--card); }
+.pill.good { background: var(--good-bg); color: var(--good); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
 
 .row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; }
 .row .who { min-width: 0; }
@@ -146,6 +149,12 @@ function isMine(c, name) {
   return a === b || (a.length > 4 && b.startsWith(a));
 }
 const MINE = '<span class="mine" title="How you voted"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.2 4 7.6 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>My vote</span>';
+const pc = (c, name) => 'pill ' + (myVotes[c.id] ? (isMine(c, name) ? 'good' : 'bad') : 'lead');
+function pctLabel(p) {
+  if (!p || p.pct == null) return "";
+  const base = "est. " + p.pct.toFixed(0) + "% of ballots counted";
+  return p.of < p.total ? base + " in reporting counties" : base;
+}
 const GROUPS = ["State measures", "Federal", "Legislative", "County offices", "Judicial", "Local measure"];
 
 function when(iso) {
@@ -171,11 +180,11 @@ function candidate(c) {
   const lead = counted && real.length > 1 && real[0].votes > real[1].votes;
   let pill = "";
   const win = ch.find(x => x.winner);
-  if (win) pill = '<span class="pill lead">Winner: ' + esc(win.name) + '</span>';
+  if (win) pill = '<span class="' + pc(c, win.name) + '">Winner: ' + esc(win.name) + '</span>';
   else if (!counted) pill = '<span class="pill">No votes yet</span>';
-  else if (real.length === 1) pill = '<span class="pill">Unopposed</span>';
+  else if (real.length === 1) pill = '<span class="' + pc(c, real[0].name).replace('pill lead', 'pill') + '">Unopposed</span>';
   else if (real.length > 1 && real[0].votes === real[1].votes) pill = '<span class="pill">Tied</span>';
-  else pill = '<span class="pill lead">' + esc(real[0].name) + ' leads</span>';
+  else pill = '<span class="' + pc(c, real[0].name) + '">' + esc(real[0].name) + ' leads</span>';
   const rows = ch.map((x, i) => `
     <div class="row${counted && i === 0 && !x.writein ? " top" : ""}">
       <div class="who"><b>${esc(x.name)}</b>${isMine(c, x.name) ? MINE : ""}${x.party ? ` <span>Prefers ${esc(x.party.replace(/ Party$/, ""))}</span>` : ""}</div>
@@ -193,8 +202,8 @@ function measure(c) {
   const yp = tot ? 100 * y.votes / tot : 0, np = tot ? 100 * n.votes / tot : 0;
   let pill = '<span class="pill">No votes yet</span>';
   const win = ch.find(x => x.winner);
-  if (win) pill = '<span class="pill lead">' + (win.name === "Yes" ? "Approved" : "Rejected") + '</span>';
-  else if (tot) pill = yp > 50 ? '<span class="pill lead">Yes leads</span>' : np > 50 ? '<span class="pill lead">No leads</span>' : '<span class="pill">Tied</span>';
+  if (win) pill = '<span class="' + pc(c, win.name) + '">' + (win.name === "Yes" ? "Approved" : "Rejected") + '</span>';
+  else if (tot) pill = yp > 50 ? '<span class="' + pc(c, "Yes") + '">Yes leads</span>' : np > 50 ? '<span class="' + pc(c, "No") + '">No leads</span>' : '<span class="pill">Tied</span>';
   const body = `
     <div class="split" role="img" aria-label="Yes ${yp.toFixed(1)} percent, No ${np.toFixed(1)} percent"><i class="yes" style="width:${yp}%"></i><i class="no" style="width:${np}%"></i></div>
     <div class="splitlabels num"><div><b>Yes ${tot ? yp.toFixed(1) + "%" : "–"}</b>${isMine(c, "Yes") ? MINE : ""} <span>${fmt(y.votes)}</span></div><div><span>${fmt(n.votes)}</span> ${isMine(c, "No") ? MINE.replace('margin-left','margin-right') : ""}<b>No ${tot ? np.toFixed(1) + "%" : "–"}</b></div></div>
@@ -208,9 +217,9 @@ function render(d) {
   if (!d) { $("state").textContent = "No count has been loaded yet. The first Kitsap count posts shortly after 8 p.m. on election night."; return; }
   const st = d.state || {};
   $("sballots").textContent = st.ballots ? fmt(st.ballots) : "–";
-  $("sleft").textContent = st.ballots ? (st.left ? `About ${fmt(st.left)} ballots left to count` : `${st.registered ? (100 * st.ballots / st.registered).toFixed(1) + "% turnout" : "Counting"}`) : "Waiting for the first count";
+  $("sleft").textContent = st.ballots ? (st.pctCounted ? pctLabel(st.pctCounted).replace(/^est/, "Est") + (st.left ? ` · about ${fmt(st.left)} left` : "") : st.left ? `About ${fmt(st.left)} ballots left to count` : `${st.registered ? (100 * st.ballots / st.registered).toFixed(1) + "% turnout" : "Counting"}`) : "Waiting for the first count";
   $("ballots").textContent = d.ballots ? fmt(d.ballots) : "–";
-  $("turnout").textContent = d.ballots ? `${d.registered ? (100 * d.ballots / d.registered).toFixed(1) + "% turnout · " : ""}count of ${d.countStamp}` : "Waiting for the first count";
+  $("turnout").textContent = d.ballots ? `${st.kitsapPct ? pctLabel(st.kitsapPct).replace(/^est/, "Est") + " · " : ""}${d.registered ? (100 * d.ballots / d.registered).toFixed(1) + "% turnout" : ""}` : "Waiting for the first count";
   $("checked").textContent = d.checkedAt ? "Updated " + when(d.checkedAt) : "";
   const flips = (d.flips || []);
   $("flips").hidden = !flips.length;
@@ -222,7 +231,7 @@ function render(d) {
     <section class="group"><h2>${esc(g)}</h2>
     ${by[g].map(c => {
       const r = c.missing ? { pill: '<span class="pill">Not on county page</span>', body: "" } : (c.measure ? measure(c) : candidate(c));
-      return `<article class="contest"><div class="head"><div><h3>${esc(c.title)}</h3>${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}<div class="scope">${esc(c.scope || "")}${c.reporting ? " · " + esc(c.reporting) : ""}</div></div>${r.pill}</div>${r.body}</article>`;
+      return `<article class="contest"><div class="head"><div><h3>${esc(c.title)}</h3>${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}<div class="scope">${esc(c.scope || "")}${c.reporting ? " · " + esc(c.reporting) : ""}${pctLabel(c.pctCounted) ? " · " + esc(pctLabel(c.pctCounted)) : ""}${c.pctNote ? " · " + esc(c.pctNote) : ""}</div></div>${r.pill}</div>${r.body}</article>`;
     }).join("")}
     </section>`).join("");
   $("board").style.display = "grid"; $("board").style.gap = "28px";

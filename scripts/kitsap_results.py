@@ -35,6 +35,9 @@ CONTESTS = [
 
 STATE_NAMES = {'ip26-645': 'Initiative Measure No. IP26-645', 'il26-001': 'Initiative Measure No. IL26-001', 'il26-638': 'Initiative Measure No. IL26-638', 'cd6': 'Congressional District 6 - U.S. Representative', 'sc1': 'Supreme Court - Justice Position #01', 'sc3': 'Supreme Court - Justice Position #03', 'sc4': 'Supreme Court - Justice Position #04', 'sc5': 'Supreme Court - Justice Position #05', 'sc7': 'Supreme Court - Justice Position #07', 'coa': 'Court of Appeals, Division 2, District 2 - Judge Position 1'}
 
+# Districts that include only part of a county, where county-level ballots-left estimates don't apply
+PARTIAL_COUNTY_DISTRICTS = {"cd6"}
+
 NUM = re.compile(r"^-?[\d,]+$")
 PCT = re.compile(r"^-?[\d.]+%$")
 
@@ -117,18 +120,42 @@ def parse_state(data, contests):
     """Replace multi-county contests with full results from the state data."""
     el = data.get("election") or {}
     items = {txt(b.get("name")).strip(): b for b in data.get("ballotItems") or []}
-    left = 0
+    # Per-county ballots counted and each county's own estimate of ballots left to count
+    left_by, names = {}, {}
     for s in data.get("statistics") or []:
         if "Ballots Left" in txt(s.get("name")):
-            left = sum(float(g.get("value") or 0) for g in s.get("groups") or [])
-    smeta = {"ballots": int(el.get("ballotsCast") or 0), "registered": int(el.get("totalVoters") or 0),
-             "left": int(left), "asOf": el.get("asOf") or "", "official": bool(el.get("isOfficialResults"))}
+            for g in s.get("groups") or []:
+                for ch in g.get("children") or []:
+                    cid = (ch.get("id") or "").lower()
+                    names[cid] = txt(ch.get("name")).strip()
+                    if ch.get("value") is not None: left_by[cid] = float(ch["value"])
+    counted_by = {}
+    for l in data.get("localityElections") or []:
+        cid = (l.get("jurisdictionId") or "").lower()
+        counted_by[names.get(cid, cid)] = float(l.get("ballotsCast") or 0)
+    left_named = {names[k]: v for k, v in left_by.items() if k in names}
+
+    def est(counties):
+        """Estimated % of ballots counted, over the counties that have reported and given an estimate.
+        Returns {"pct", "of", "total"}: "of" counties used out of "total" in scope."""
+        if not counties: return None
+        use = [c for c in counties if counted_by.get(c, 0) > 0 and c in left_named]
+        if not use: return None
+        cnt = sum(counted_by[c] for c in use); lft = sum(left_named[c] for c in use)
+        return {"pct": round(100 * cnt / (cnt + lft), 1), "of": len(use), "total": len(counties)} if cnt + lft else None
+
+    all_counties = sorted(counted_by)
+    tot_counted = int(sum(counted_by.values())); tot_left = int(sum(left_named.values()))
+    smeta = {"ballots": int(el.get("ballotsCast") or 0) or tot_counted, "registered": int(el.get("totalVoters") or 0),
+             "left": tot_left, "pctCounted": est(all_counties), "kitsapPct": est(["Kitsap County"]),
+             "asOf": el.get("asOf") or "", "official": bool(el.get("isOfficialResults"))}
     out = []
     for c in contests:
         name = STATE_NAMES.get(c["id"])
         b = items.get(name) if name else None
         if not name:
             c["scope"] = "Kitsap County"
+            c["pctCounted"] = smeta["kitsapPct"]
             out.append(c); continue
         if b is None:
             c["stateMissing"] = True
@@ -149,7 +176,10 @@ def parse_state(data, contests):
         total = int(rs.get("totalUnits") or len(counties) or 1)
         if total >= 39: scope = "Statewide"
         else: scope = f"All {total} counties in the district"
+        partial = c["id"] in PARTIAL_COUNTY_DISTRICTS
         out.append({**c, "choices": ch, "cast": cast, "scope": scope,
+                    "pctCounted": None if partial else est(counties if total < 39 else all_counties),
+                    "pctNote": "Estimate unavailable: district covers only part of Pierce County" if partial else "",
                     "reporting": f'{int(rs.get("reportingUnits") or 0)} of {total} counties reporting',
                     "undervotes": int(b.get("underVoteCount") or 0), "overvotes": int(b.get("overVoteCount") or 0)})
     return smeta, out
